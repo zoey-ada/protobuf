@@ -100,7 +100,7 @@ message TestMessageWithCustomOptions {
   option message_set_wire_format = false;
   option (message_opt1) = -56;
 
-  optional string field1 = 1 [ctype = CORD, (field_opt1) = 8765432109];
+  optional bytes field1 = 1 [ctype = CORD, (field_opt1) = 8765432109];
 
   oneof AnOneof {
     option (oneof_opt1) = -99;

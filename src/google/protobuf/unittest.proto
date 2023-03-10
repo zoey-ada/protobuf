@@ -106,7 +106,7 @@ message TestAllTypes {
   optional protobuf_unittest_import.ImportEnum    optional_import_enum     = 23;
 
   optional string optional_string_piece = 24 [ctype=STRING_PIECE];
-  optional string optional_cord = 25 [ctype=CORD];
+  optional bytes optional_cord = 25 [ctype=CORD];
 
   // Defined in unittest_import_public.proto
   optional protobuf_unittest_import.PublicImportMessage
@@ -172,7 +172,7 @@ message TestAllTypes {
       default_import_enum = 83 [default = IMPORT_BAR];
 
   optional string default_string_piece = 84 [ctype=STRING_PIECE,default="abc"];
-  optional string default_cord = 85 [ctype=CORD,default="123"];
+  optional bytes default_cord = 85 [ctype=CORD,default="123"];
 
   // For oneof test
   oneof oneof_field {
@@ -267,7 +267,9 @@ extend TestAllExtensions {
     optional_import_enum_extension = 23;
 
   optional string optional_string_piece_extension = 24 [ctype=STRING_PIECE];
-  optional string optional_cord_extension = 25 [ctype=CORD];
+  // TODO(b/273349148): ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  optional bytes optional_cord_extension = 25;
 
   optional protobuf_unittest_import.PublicImportMessage
     optional_public_import_message_extension = 26;
@@ -309,7 +311,9 @@ extend TestAllExtensions {
     repeated_import_enum_extension = 53;
 
   repeated string repeated_string_piece_extension = 54 [ctype=STRING_PIECE];
-  repeated string repeated_cord_extension = 55 [ctype=CORD];
+  // TODO(b/273349148): ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  repeated string repeated_cord_extension = 55;
 
   repeated TestAllTypes.NestedMessage
     repeated_lazy_message_extension = 57 [lazy=true];
@@ -340,7 +344,9 @@ extend TestAllExtensions {
 
   optional string default_string_piece_extension = 84 [ctype=STRING_PIECE,
                                                        default="abc"];
-  optional string default_cord_extension = 85 [ctype=CORD, default="123"];
+  // TODO(b/273349148): ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  optional bytes default_cord_extension = 85 [default="123"];
 
   // For oneof test
   optional uint32 oneof_uint32_extension = 111;

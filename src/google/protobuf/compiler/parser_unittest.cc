@@ -572,11 +572,7 @@ TEST_F(ParseMessageTest, FieldOptions) {
       "  name: \"TestMessage\""
       "  field { name: \"foo\" label: LABEL_OPTIONAL type: TYPE_STRING number: "
       "1"
-      "          options { uninterpreted_option: { name { name_part: \"ctype\" "
-      "                                                   is_extension: false "
-      "} "
-      "                                            identifier_value: \"CORD\"  "
-      "}"
+      "          options { ctype: CORD "
       "                    uninterpreted_option: { name { name_part: \"foo\" "
       "                                                   is_extension: true } "
       "                                            positive_int_value: 7  }"
@@ -1985,6 +1981,33 @@ TEST_F(ParserValidationErrorTest, FieldDefaultIntegerOutOfRange) {
       "1:37: Integer out of range.\n");
 }
 
+TEST_F(ParseErrorTest, FieldCtypeTypeError) {
+  ExpectHasEarlyExitErrors(
+      "message Foo {\n"
+      "  optional int32 bar = 1 [ctype=STRING];\n"
+      "}\n",
+      "1:26: ctype can only be set to STRING/CORD/STRING_PIECE, and can only "
+      "be specified for string and bytes fields.\n");
+}
+
+TEST_F(ParseErrorTest, FieldCtypeExtensionError) {
+  ExpectHasEarlyExitErrors(
+      "message Foo {\n"
+      "  optional int32 bar = 1;\n"
+      "}\n"
+      "extend Foo {\n"
+      "  optional bytes bytes_cord = 999 [ctype=CORD];\n"
+      "}\n",
+      "4:41: [ctype=CORD] can not be specified for extensions.\n");
+}
+
+TEST_F(ParseErrorTest, FieldCtypeValueError) {
+  ExpectHasEarlyExitErrors(
+      "message Foo {\n"
+      "  optional bytes bar = 1 [ctype=1];\n"
+      "}\n",
+      "1:32: ctype only accept STRING, CORD and STRING_PIECE.\n");
+}
 TEST_F(ParserValidationErrorTest, FieldOptionOutOfRange) {
   ExpectHasErrors(
       "message Foo {\n"
@@ -2014,15 +2037,6 @@ TEST_F(ParserValidationErrorTest, FieldOptionNameError) {
       "}\n",
       "1:25: Option \"foo\" unknown. Ensure that your proto definition file "
       "imports the proto which defines the option.\n");
-}
-
-TEST_F(ParserValidationErrorTest, FieldOptionValueError) {
-  ExpectHasValidationErrors(
-      "message Foo {\n"
-      "  optional int32 bar = 1 [ctype=1];\n"
-      "}\n",
-      "1:32: Value must be identifier for enum-valued option "
-      "\"google.protobuf.FieldOptions.ctype\".\n");
 }
 
 TEST_F(ParserValidationErrorTest, ExtensionRangeNumberError) {

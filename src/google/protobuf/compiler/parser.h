@@ -479,6 +479,9 @@ class PROTOBUF_EXPORT Parser {
                      const LocationRecorder& field_location,
                      const FileDescriptorProto* containing_file);
 
+  bool ParseCtype(FieldDescriptorProto* field,
+                  const LocationRecorder& field_location);
+
   enum OptionStyle {
     OPTION_ASSIGNMENT,  // just "name = value"
     OPTION_STATEMENT    // "option name = value;"

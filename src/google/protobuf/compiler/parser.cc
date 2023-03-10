@@ -1243,6 +1243,8 @@ bool Parser::ParseFieldOptions(FieldDescriptorProto* field,
     } else if (LookingAt("json_name")) {
       // Like default value, this "json_name" is not an actual option.
       DO(ParseJsonName(field, field_location, containing_file));
+    } else if (LookingAt("ctype")) {
+      DO(ParseCtype(field, field_location));
     } else {
       DO(ParseOption(field->mutable_options(), location, containing_file,
                      OPTION_ASSIGNMENT));
@@ -1413,6 +1415,55 @@ bool Parser::ParseJsonName(FieldDescriptorProto* field,
 
   DO(ConsumeString(field->mutable_json_name(),
                    "Expected string for JSON name."));
+  return true;
+}
+
+bool Parser::ParseCtype(FieldDescriptorProto* field,
+                        const LocationRecorder& field_location) {
+  if (field->options().has_ctype()) {
+    RecordError("Already set option \"ctype\".");
+    field->mutable_options()->clear_ctype();
+  }
+
+  if (field->type() != FieldDescriptorProto::TYPE_STRING &&
+      field->type() != FieldDescriptorProto::TYPE_BYTES) {
+    RecordError(
+        "ctype can only be set to STRING/CORD/STRING_PIECE, and can "
+        "only be specified for string and bytes fields.");
+    return false;
+  }
+
+  LocationRecorder location(field_location,
+                            FieldDescriptorProto::kOptionsFieldNumber);
+  location.RecordLegacyLocation(field,
+                                DescriptorPool::ErrorCollector::OPTION_NAME);
+
+  DO(Consume("ctype"));
+  DO(Consume("="));
+
+  if (LookingAt("STRING")) {
+    DO(Consume("STRING"));
+    field->mutable_options()->set_ctype(FieldOptions::STRING);
+  } else if (LookingAt("CORD")) {
+    if (field->has_extendee()) {
+      RecordError("[ctype=CORD] can not be specified for extensions.");
+      return false;
+    }
+    if (field->label() == FieldDescriptorProto::LABEL_REPEATED ||
+        field->type() != FieldDescriptorProto::TYPE_BYTES) {
+      RecordWarning("[ctype=CORD] is only supported for singular bytes "
+                    "fields in open source.);
+    }
+    DO(Consume("CORD"));
+    field->mutable_options()->set_ctype(FieldOptions::CORD);
+  } else if (LookingAt("STRING_PIECE")) {
+    DO(Consume("STRING_PIECE"));
+    field->mutable_options()->set_ctype(FieldOptions::STRING_PIECE);
+  } else {
+    RecordError("ctype only accept STRING, CORD and STRING_PIECE.");
+    return false;
+  }
+
   return true;
 }
 

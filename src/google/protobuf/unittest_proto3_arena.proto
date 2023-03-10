@@ -89,7 +89,7 @@ message TestAllTypes {
   // optional protobuf_unittest_import.ImportEnum    optional_import_enum  = 23;
 
   string optional_string_piece = 24 [ctype=STRING_PIECE];
-  string optional_cord = 25 [ctype=CORD];
+  bytes optional_cord = 25 [ctype=CORD];
 
   // Defined in unittest_import_public.proto
   protobuf_unittest_import.PublicImportMessage
@@ -152,7 +152,6 @@ message TestAllTypes {
   // repeated protobuf_unittest_import.ImportEnum    repeated_import_enum  = 53;
 
   repeated string repeated_string_piece = 54 [ctype=STRING_PIECE];
-  repeated string repeated_cord = 55 [ctype=CORD];
 
   repeated NestedMessage repeated_lazy_message = 57 [lazy=true];
 
