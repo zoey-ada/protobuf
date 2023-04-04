@@ -703,9 +703,15 @@ class RepeatedString : public FieldGeneratorBase {
   std::vector<Sub> MakeVars() const override { return Vars(field_, *opts_); }
 
   void GeneratePrivateMembers(io::Printer* p) const override {
-    p->Emit(R"cc(
-      $pb$::RepeatedPtrField<std::string> $name$_;
-    )cc");
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        void* $name$_;
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        $pb$::RepeatedPtrField<std::string> $name$_;
+      )cc");
+    }
   }
 
   void GenerateClearingCode(io::Printer* p) const override {
@@ -715,12 +721,20 @@ class RepeatedString : public FieldGeneratorBase {
   }
 
   void GenerateMergingCode(io::Printer* p) const override {
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(if (from.$field_$ != $pbi$::DefaultRepeatedPtrField()) )cc");
+    }
     p->Emit(R"cc(
       _this->_internal_mutable_$name$()->MergeFrom(from._internal_$name$());
     )cc");
   }
 
   void GenerateSwappingCode(io::Printer* p) const override {
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if (!_internal_$name$().empty() || !other->_internal_$name$().empty())
+      )cc");
+    }
     p->Emit(R"cc(
       _internal_mutable_$name$()->InternalSwap(
           other->_internal_mutable_$name$());
@@ -728,15 +742,41 @@ class RepeatedString : public FieldGeneratorBase {
   }
 
   void GenerateDestructorCode(io::Printer* p) const override {
-    p->Emit(R"cc(
-      _internal_mutable_$name$()->~RepeatedPtrField();
-    )cc");
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if ($field_$ != $pbi$::DefaultRepeatedPtrField()) {
+          delete reinterpret_cast<$pb$::RepeatedPtrField<std::string>*>($field_$);
+        }
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        _internal_mutable_$name$()->~RepeatedPtrField();
+      )cc");
+    }
+  }
+
+  void GenerateConstexprAggregateInitializer(io::Printer* p) const override {
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        /*decltype($field_$)*/ $pbi$::DefaultRepeatedPtrField(),
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        /*decltype($field_$)*/ {},
+      )cc");
+    }
   }
 
   void GenerateConstructorCode(io::Printer* p) const override {}
 
   void GenerateCopyConstructorCode(io::Printer* p) const override {
-    ABSL_CHECK(!ShouldSplit(field_, options_));
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if (!from._internal_$name$().empty()) {
+          _internal_mutable_$name$()->MergeFrom(from._internal_$name$());
+        }
+      )cc");
+    }
   }
 
   void GenerateByteSize(io::Printer* p) const override {
@@ -891,15 +931,36 @@ void RepeatedString::GenerateInlineAccessorDefinitions(io::Printer* p) const {
               // @@protoc_insertion_point(field_mutable_list:$pkg.Msg.field$)
               return _internal_mutable_$name$();
             }
-            inline const ::$proto_ns$::RepeatedPtrField<std::string>&
-            $Msg$::_internal_$name$() const {
-              return $field_$;
-            }
-            inline ::$proto_ns$::RepeatedPtrField<std::string>*
-            $Msg$::_internal_mutable_$name$() {
-              return &$field_$;
-            }
           )cc");
+  if (ShouldSplit(descriptor_, options_)) {
+    p->Emit(R"cc(
+      inline const $pb$::RepeatedPtrField<std::string>&
+      $Msg$::_internal_$name$() const {
+        return *reinterpret_cast<const $pb$::RepeatedPtrField<std::string>*>(
+            $field_$);
+      }
+      inline $pb$::RepeatedPtrField<std::string>* $Msg$::_internal_mutable_$name$() {
+        $PrepareSplitMessageForWrite$ if ($field_$ ==
+                                          $pbi$::DefaultRepeatedPtrField()) {
+          $field_$ =
+              $pb$::Arena::CreateMessage<$pb$::RepeatedPtrField<std::string>>(
+                  this->GetArenaForAllocation());
+        }
+        return reinterpret_cast<$pb$::RepeatedPtrField<std::string>*>($field_$);
+      }
+    )cc");
+  } else {
+    p->Emit(R"cc(
+      inline const ::$proto_ns$::RepeatedPtrField<std::string>&
+      $Msg$::_internal_$name$() const {
+        return $field_$;
+      }
+      inline ::$proto_ns$::RepeatedPtrField<std::string>*
+      $Msg$::_internal_mutable_$name$() {
+        return &$field_$;
+      }
+    )cc");
+  }
 }
 
 void RepeatedString::GenerateSerializeWithCachedSizesToArray(

@@ -60,6 +60,14 @@ RepeatedField<absl::Cord>::SpaceUsedExcludingSelfLong() const {
 }
 
 
+namespace internal {
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const RepeatedFieldDefaultTypeInternal
+        _RepeatedField_default_instance_;
+
+}  // namespace internal
+
 }  // namespace protobuf
 }  // namespace google
 

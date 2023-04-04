@@ -45,6 +45,7 @@
 #define GOOGLE_PROTOBUF_REPEATED_FIELD_H__
 
 #include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -1222,6 +1223,25 @@ internal::RepeatedFieldBackInsertIterator<T> RepeatedFieldBackInserter(
   return internal::RepeatedFieldBackInsertIterator<T>(mutable_field);
 }
 
+
+namespace internal {
+
+struct RepeatedFieldDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR RepeatedFieldDefaultTypeInternal() : instance() {}
+  ~RepeatedFieldDefaultTypeInternal() {}
+  union {
+    RepeatedField<int32_t> instance;
+  };
+};
+
+extern const RepeatedFieldDefaultTypeInternal _RepeatedField_default_instance_;
+
+constexpr void* DefaultRepeatedField() {
+  return const_cast<void*>(
+      static_cast<const void*>(&_RepeatedField_default_instance_.instance));
+}
+
+}  // namespace internal
 
 }  // namespace protobuf
 }  // namespace google

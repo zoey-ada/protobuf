@@ -79,7 +79,7 @@ struct Options {
   bool annotate_accessor = false;
   bool unverified_lazy_message_sets = false;
   bool profile_driven_inline_string = true;
-  bool force_split = false;
+  bool force_split = true;  // DO_NOT_SUBMIT: for TGP
   bool profile_driven_split = true;
 #ifdef PROTOBUF_STABLE_EXPERIMENTS
   bool force_eagerly_verified_lazy = true;

@@ -146,6 +146,11 @@ MessageLite* RepeatedPtrFieldBase::AddWeak(const MessageLite* prototype) {
   return result;
 }
 
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+        RepeatedPtrFieldBaseDefaultTypeInternal
+            _RepeatedPtrFieldBase_default_instance_;
+
 }  // namespace internal
 
 }  // namespace protobuf

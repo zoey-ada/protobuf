@@ -1563,12 +1563,16 @@ const Type& Reflection::GetRaw(const Message& message,
                                const FieldDescriptor* field) const {
   ABSL_DCHECK(!schema_.InRealOneof(field) || HasOneofField(message, field))
       << "Field = " << field->full_name();
+  const uint32_t field_offset = schema_.GetFieldOffset(field);
   if (schema_.IsSplit(field)) {
-    return *internal::GetConstPointerAtOffset<Type>(
-        GetSplitField(&message), schema_.GetFieldOffset(field));
+    const void* split = GetSplitField(&message);
+    if (field->is_repeated()) {
+      return **internal::GetConstPointerAtOffset<Type*>(split, field_offset);
+    } else {
+      return *internal::GetConstPointerAtOffset<Type>(split, field_offset);
+    }
   }
-  return internal::GetConstRefAtOffset<Type>(message,
-                                             schema_.GetFieldOffset(field));
+  return internal::GetConstRefAtOffset<Type>(message, field_offset);
 }
 }  // namespace protobuf
 }  // namespace google

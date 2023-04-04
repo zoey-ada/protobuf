@@ -84,6 +84,7 @@ namespace internal {
 
 class MergePartialFromCodedStreamHelper;
 class SwapFieldHelper;
+struct RepeatedPtrFieldBaseDefaultTypeInternal;
 
 
 }  // namespace internal
@@ -646,6 +647,10 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
 
  private:
   template <typename T> friend class Arena::InternalHelper;
+  friend struct RepeatedPtrFieldBaseDefaultTypeInternal;
+
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
 
   static constexpr int kInitialSize = 0;
   // A few notes on internal representation:
@@ -896,6 +901,22 @@ class StringTypeHandler {
     return sizeof(value) + StringSpaceUsedExcludingSelfLong(value);
   }
 };
+
+struct RepeatedPtrFieldBaseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR RepeatedPtrFieldBaseDefaultTypeInternal() : instance() {}
+  ~RepeatedPtrFieldBaseDefaultTypeInternal() {}
+  union {
+    RepeatedPtrFieldBase instance;
+  };
+};
+
+extern const RepeatedPtrFieldBaseDefaultTypeInternal
+    _RepeatedPtrFieldBase_default_instance_;
+
+constexpr void* DefaultRepeatedPtrField() {
+  return const_cast<void*>(static_cast<const void*>(
+      &_RepeatedPtrFieldBase_default_instance_.instance));
+}
 
 }  // namespace internal
 
@@ -1260,7 +1281,9 @@ constexpr RepeatedPtrField<Element>::RepeatedPtrField()
 template <typename Element>
 inline RepeatedPtrField<Element>::RepeatedPtrField(Arena* arena)
     : RepeatedPtrFieldBase(arena) {
-  StaticValidityCheck();
+  // We can't have StaticValidityCheck here because that requires Element to be
+  // a complete type, and in split repeated fields cases, we call
+  // CreateMaybeMessage<RepeatedPtrField<T>> for incomplete Ts.
 }
 
 template <typename Element>

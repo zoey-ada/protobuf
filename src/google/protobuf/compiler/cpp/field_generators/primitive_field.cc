@@ -320,31 +320,64 @@ class RepeatedPrimitive final : public FieldGeneratorBase {
   }
 
   void GenerateMergingCode(io::Printer* p) const override {
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(if (from.$field_$ != $pbi$::DefaultRepeatedField()) )cc");
+    }
     p->Emit(R"cc(
-      _this->$field_$.MergeFrom(from.$field_$);
+      _this->_internal_mutable_$name$()->MergeFrom(from._internal_$name$());
     )cc");
   }
 
   void GenerateSwappingCode(io::Printer* p) const override {
-    p->Emit(R"cc(
-      $field_$.InternalSwap(&other->$field_$);
-    )cc");
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if (!_internal_$name$().empty() || !other->_internal_$name$().empty()) {
+          _internal_mutable_$name$()->InternalSwap(other->_internal_mutable_$name$());
+        }
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        $field_$.InternalSwap(&other->$field_$);
+      )cc");
+    }
   }
 
   void GenerateDestructorCode(io::Printer* p) const override {
-    p->Emit(R"cc(
-      $field_$.~RepeatedField();
-    )cc");
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if ($field_$ != $pbi$::DefaultRepeatedField()) {
+          delete reinterpret_cast<$pb$::RepeatedField<$Type$>*>($field_$);
+        }
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        $field_$.~RepeatedField();
+      )cc");
+    }
   }
 
   void GenerateConstructorCode(io::Printer* p) const override {}
 
-  void GenerateCopyConstructorCode(io::Printer* p) const override {}
+  void GenerateCopyConstructorCode(io::Printer* p) const override {
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        if (!from._internal_$name$().empty()) {
+          _internal_mutable_$name$()->MergeFrom(from._internal_$name$());
+        }
+      )cc");
+    }
+  }
 
   void GenerateConstexprAggregateInitializer(io::Printer* p) const override {
-    p->Emit(R"cc(
-      /*decltype($field_$)*/ {},
-    )cc");
+    if (ShouldSplit(descriptor_, options_)) {
+      p->Emit(R"cc(
+        /*decltype($field_$)*/ $pbi$::DefaultRepeatedField(),
+      )cc");
+    } else {
+      p->Emit(R"cc(
+        /*decltype($field_$)*/ {},
+      )cc");
+    }
     GenerateCacheSizeInitializer(p);
   }
 
@@ -391,9 +424,15 @@ class RepeatedPrimitive final : public FieldGeneratorBase {
 };
 
 void RepeatedPrimitive::GeneratePrivateMembers(io::Printer* p) const {
-  p->Emit(R"cc(
-    $pb$::RepeatedField<$Type$> $name$_;
-  )cc");
+  if (ShouldSplit(descriptor_, options_)) {
+    p->Emit(R"cc(
+      void* $name$_;
+    )cc");
+  } else {
+    p->Emit(R"cc(
+      $pb$::RepeatedField<$Type$> $name$_;
+    )cc");
+  }
 
   if (HasCachedSize()) {
     p->Emit({{"_cached_size_", MakeVarintCachedSizeName(field_)}},
@@ -454,13 +493,32 @@ void RepeatedPrimitive::GenerateInlineAccessorDefinitions(
       return _internal_mutable_$name$();
     }
 
-    inline const $pb$::RepeatedField<$Type$>& $Msg$::_internal_$name$() const {
-      return $field_$;
-    }
-    inline $pb$::RepeatedField<$Type$>* $Msg$::_internal_mutable_$name$() {
-      return &$field_$;
-    }
   )cc");
+  if (ShouldSplit(descriptor_, options_)) {
+    p->Emit(R"cc(
+      inline const $pb$::RepeatedField<$Type$>& $Msg$::_internal_$name$()
+          const {
+        return *reinterpret_cast<const $pb$::RepeatedField<$Type$>*>($field_$);
+      }
+      inline $pb$::RepeatedField<$Type$>* $Msg$::_internal_mutable_$name$() {
+        $PrepareSplitMessageForWrite$ if ($field_$ == $pbi$::DefaultRepeatedField()) {
+          $field_$ = $pb$::Arena::CreateMessage<$pb$::RepeatedField<$Type$>>(
+              this->GetArenaForAllocation());
+        }
+        return reinterpret_cast<$pb$::RepeatedField<$Type$>*>($field_$);
+      }
+    )cc");
+  } else {
+    p->Emit(R"cc(
+      inline const $pb$::RepeatedField<$Type$>& $Msg$::_internal_$name$()
+          const {
+        return $field_$;
+      }
+      inline $pb$::RepeatedField<$Type$>* $Msg$::_internal_mutable_$name$() {
+        return &$field_$;
+      }
+    )cc");
+  }
 }
 
 void RepeatedPrimitive::GenerateSerializeWithCachedSizesToArray(

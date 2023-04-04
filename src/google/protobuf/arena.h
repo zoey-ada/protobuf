@@ -49,6 +49,7 @@ using type_info = ::type_info;
 #endif
 
 #include "absl/meta/type_traits.h"
+#include "absl/utility/internal/if_constexpr.h"
 #include "google/protobuf/arena_align.h"
 #include "google/protobuf/arena_config.h"
 #include "google/protobuf/port.h"
@@ -568,12 +569,16 @@ class PROTOBUF_EXPORT PROTOBUF_ALIGNAS(8) Arena final {
 
   template <typename T, bool trivial = std::is_trivially_destructible<T>::value>
   PROTOBUF_NDEBUG_INLINE void* AllocateInternal() {
-    if (trivial) {
-      return AllocateAligned(sizeof(T), alignof(T));
-    } else {
-      constexpr auto dtor = &internal::cleanup::arena_destruct_object<T>;
-      return AllocateAlignedWithCleanup(sizeof(T), alignof(T), dtor);
-    }
+    // By using IfConstexprElse, we can avoid instantiating
+    // arena_destruct_object<T> in the trivial case.
+    return absl::utility_internal::IfConstexprElse<trivial>(
+        [&](auto*) { return AllocateAligned(sizeof(T), alignof(T)); },
+        [&](auto* ptr) {
+          constexpr auto dtor = &internal::cleanup::arena_destruct_object<
+              std::remove_pointer_t<decltype(ptr)>>;
+          return AllocateAlignedWithCleanup(sizeof(T), alignof(T), dtor);
+        },
+        static_cast<T*>(nullptr));
   }
 
   // CreateMessage<T> requires that T supports arenas, but this private method
