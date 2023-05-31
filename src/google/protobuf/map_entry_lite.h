@@ -61,10 +61,6 @@ namespace internal {
 template <typename Derived, typename Key, typename Value,
           WireFormatLite::FieldType kKeyFieldType,
           WireFormatLite::FieldType kValueFieldType>
-class MapEntry;
-template <typename Derived, typename Key, typename Value,
-          WireFormatLite::FieldType kKeyFieldType,
-          WireFormatLite::FieldType kValueFieldType>
 class MapFieldLite;
 }  // namespace internal
 }  // namespace protobuf
@@ -102,17 +98,37 @@ struct MoveHelper<false, false, true, T> {  // strings and similar
   }
 };
 
-// MapEntryImpl is used to implement parsing and serialization of map entries.
+// We extract the unused or generic parts of the MessageLite inteface on this
+// base class to reduce bloat. This is temporary until we drop the base class.
+class MapEntryLiteBase : public MessageLite {
+ public:
+  using MessageLite::MessageLite;
+
+  std::string GetTypeName() const final { return ""; }
+
+  void CheckTypeAndMergeFrom(const MessageLite& other) final {
+    ABSL_LOG(FATAL) << "Unimplemented";
+  }
+
+  MessageLite* New(Arena* arena) const final {
+    ABSL_LOG(FATAL) << "Unimplemented";
+  }
+
+  int GetCachedSize() const final { return ByteSizeLong(); }
+
+  void Clear() override { ABSL_LOG(FATAL) << "Unimplemented"; }
+};
+
+// MapEntryLite is used to implement parsing and serialization of map entries.
 // It uses Curiously Recurring Template Pattern (CRTP) to provide the type of
 // the eventual code to the template code.
-template <typename Derived, typename Base, typename Key, typename Value,
+//
+// TODO(b/265201570): This class handles some of the non-TDP parser. Once we
+// remove the legacy parser we can clean up this class.
+template <typename Derived, typename Key, typename Value,
           WireFormatLite::FieldType kKeyFieldType,
           WireFormatLite::FieldType kValueFieldType>
-class MapEntryImpl : public Base {
- public:
-  typedef MapEntryFuncs<Key, Value, kKeyFieldType, kValueFieldType> Funcs;
-
- protected:
+class MapEntryLite : public MapEntryLiteBase {
   // Provide utilities to parse/serialize key/value.  Provide utilities to
   // manipulate internal stored type.
   typedef MapTypeHandler<kKeyFieldType, Key> KeyTypeHandler;
@@ -141,6 +157,7 @@ class MapEntryImpl : public Base {
   static const size_t kTagSize = 1;
 
  public:
+  typedef MapEntryFuncs<Key, Value, kKeyFieldType, kValueFieldType> Funcs;
   // Work-around for a compiler bug (see repeated_field.h).
   typedef void MapEntryHasMergeTypeTrait;
   typedef Derived EntryType;
@@ -149,24 +166,22 @@ class MapEntryImpl : public Base {
   static const WireFormatLite::FieldType kEntryKeyFieldType = kKeyFieldType;
   static const WireFormatLite::FieldType kEntryValueFieldType = kValueFieldType;
 
-  constexpr MapEntryImpl()
-      : key_(KeyTypeHandler::Constinit()),
-        value_(ValueTypeHandler::Constinit()),
-        _has_bits_{} {}
+  MapEntryLite() : MapEntryLite(nullptr) {}
 
-  explicit MapEntryImpl(Arena* arena)
-      : Base(arena),
+  explicit MapEntryLite(Arena* arena)
+      : MapEntryLiteBase(arena),
         key_(KeyTypeHandler::Constinit()),
         value_(ValueTypeHandler::Constinit()),
         _has_bits_{} {}
 
-  MapEntryImpl(const MapEntryImpl&) = delete;
-  MapEntryImpl& operator=(const MapEntryImpl&) = delete;
+  MapEntryLite(const MapEntryLite&) = delete;
+  MapEntryLite& operator=(const MapEntryLite&) = delete;
 
-  ~MapEntryImpl() override {
-    if (Base::GetArenaForAllocation() != nullptr) return;
+  ~MapEntryLite() override {
+    if (GetArenaForAllocation() != nullptr) return;
     KeyTypeHandler::DeleteNoArena(key_);
     ValueTypeHandler::DeleteNoArena(value_);
+    _internal_metadata_.template Delete<std::string>();
   }
 
   // accessors ======================================================
@@ -179,23 +194,14 @@ class MapEntryImpl : public Base {
   }
   inline KeyMapEntryAccessorType* mutable_key() {
     set_has_key();
-    return KeyTypeHandler::EnsureMutable(&key_, Base::GetArenaForAllocation());
+    return KeyTypeHandler::EnsureMutable(&key_, GetArenaForAllocation());
   }
   inline ValueMapEntryAccessorType* mutable_value() {
     set_has_value();
-    return ValueTypeHandler::EnsureMutable(&value_,
-                                           Base::GetArenaForAllocation());
+    return ValueTypeHandler::EnsureMutable(&value_, GetArenaForAllocation());
   }
 
   // implements MessageLite =========================================
-
-  // MapEntryImpl is for implementation only and this function isn't called
-  // anywhere. Just provide a fake implementation here for MessageLite.
-  std::string GetTypeName() const override { return ""; }
-
-  void CheckTypeAndMergeFrom(const MessageLite& other) override {
-    MergeFromInternal(*::google::protobuf::internal::DownCast<const Derived*>(&other));
-  }
 
   const char* _InternalParse(const char* ptr, ParseContext* ctx) final {
     while (!ctx->Done(&ptr)) {
@@ -239,53 +245,8 @@ class MapEntryImpl : public Base {
     return ValueTypeHandler::Write(kValueFieldNumber, value(), ptr, stream);
   }
 
-  // Don't override SerializeWithCachedSizesToArray.  Use MessageLite's.
-
-  int GetCachedSize() const override {
-    int size = 0;
-    size += has_key() ? static_cast<int>(kTagSize) +
-                            KeyTypeHandler::GetCachedSize(key())
-                      : 0;
-    size += has_value() ? static_cast<int>(kTagSize) +
-                              ValueTypeHandler::GetCachedSize(value())
-                        : 0;
-    return size;
-  }
-
   bool IsInitialized() const override {
     return ValueTypeHandler::IsInitialized(value_);
-  }
-
-  Base* New(Arena* arena) const override {
-    Derived* entry = Arena::CreateMessage<Derived>(arena);
-    return entry;
-  }
-
- protected:
-  // We can't declare this function directly here as it would hide the other
-  // overload (const Message&).
-  void MergeFromInternal(const MapEntryImpl& from) {
-    if (from._has_bits_[0]) {
-      if (from.has_key()) {
-        KeyTypeHandler::EnsureMutable(&key_, Base::GetArenaForAllocation());
-        KeyTypeHandler::Merge(from.key(), &key_, Base::GetArenaForAllocation());
-        set_has_key();
-      }
-      if (from.has_value()) {
-        ValueTypeHandler::EnsureMutable(&value_, Base::GetArenaForAllocation());
-        ValueTypeHandler::Merge(from.value(), &value_,
-                                Base::GetArenaForAllocation());
-        set_has_value();
-      }
-    }
-  }
-
- public:
-  void Clear() override {
-    KeyTypeHandler::Clear(&key_, Base::GetArenaForAllocation());
-    ValueTypeHandler::Clear(&value_, Base::GetArenaForAllocation());
-    clear_has_key();
-    clear_has_value();
   }
 
   // Parsing using MergePartialFromCodedStream, above, is not as
@@ -357,7 +318,7 @@ class MapEntryImpl : public Base {
       return ptr;
     }
 
-    MapEntryImpl* NewEntry() { return entry_ = mf_->NewEntry(); }
+    MapEntryLite* NewEntry() { return entry_ = mf_->NewEntry(); }
 
     const Key& key() const { return key_; }
     const Value& value() const { return *value_ptr_; }
@@ -404,24 +365,8 @@ class MapEntryImpl : public Base {
     Map* const map_;
     Key key_;
     Value* value_ptr_;
-    MapEntryImpl* entry_ = nullptr;
+    MapEntryLite* entry_ = nullptr;
   };
-
- protected:
-  void set_has_key() { _has_bits_[0] |= 0x00000001u; }
-  bool has_key() const { return (_has_bits_[0] & 0x00000001u) != 0; }
-  void clear_has_key() { _has_bits_[0] &= ~0x00000001u; }
-  void set_has_value() { _has_bits_[0] |= 0x00000002u; }
-  bool has_value() const { return (_has_bits_[0] & 0x00000002u) != 0; }
-  void clear_has_value() { _has_bits_[0] &= ~0x00000002u; }
-
- public:
-  inline Arena* GetArena() const { return Base::GetArena(); }
-
- protected:  // Needed for constructing tables
-  KeyOnMemory key_;
-  ValueOnMemory value_;
-  uint32_t _has_bits_[1];
 
  private:
   friend class google::protobuf::Arena;
@@ -429,33 +374,22 @@ class MapEntryImpl : public Base {
   typedef void DestructorSkippable_;
   template <typename C, typename K, typename V, WireFormatLite::FieldType,
             WireFormatLite::FieldType>
-  friend class google::protobuf::internal::MapEntry;
-  template <typename C, typename K, typename V, WireFormatLite::FieldType,
-            WireFormatLite::FieldType>
   friend class google::protobuf::internal::MapFieldLite;
 
   template <typename DerivedT, typename KeyT, typename TT,
             WireFormatLite::FieldType, WireFormatLite::FieldType>
   friend class google::protobuf::internal::MapField;
-};
 
-template <typename T, typename Key, typename Value,
-          WireFormatLite::FieldType kKeyFieldType,
-          WireFormatLite::FieldType kValueFieldType>
-class MapEntryLite : public MapEntryImpl<T, MessageLite, Key, Value,
-                                         kKeyFieldType, kValueFieldType> {
- public:
-  typedef MapEntryImpl<T, MessageLite, Key, Value, kKeyFieldType,
-                       kValueFieldType>
-      SuperType;
-  constexpr MapEntryLite() {}
-  MapEntryLite(const MapEntryLite&) = delete;
-  MapEntryLite& operator=(const MapEntryLite&) = delete;
-  explicit MapEntryLite(Arena* arena) : SuperType(arena) {}
-  ~MapEntryLite() override {
-    MessageLite::_internal_metadata_.template Delete<std::string>();
-  }
-  void MergeFrom(const MapEntryLite& other) { MergeFromInternal(other); }
+  void set_has_key() { _has_bits_[0] |= 0x00000001u; }
+  bool has_key() const { return (_has_bits_[0] & 0x00000001u) != 0; }
+  void clear_has_key() { _has_bits_[0] &= ~0x00000001u; }
+  void set_has_value() { _has_bits_[0] |= 0x00000002u; }
+  bool has_value() const { return (_has_bits_[0] & 0x00000002u) != 0; }
+  void clear_has_value() { _has_bits_[0] &= ~0x00000002u; }
+
+  KeyOnMemory key_;
+  ValueOnMemory value_;
+  uint32_t _has_bits_[1];
 };
 
 // Helpers for deterministic serialization =============================

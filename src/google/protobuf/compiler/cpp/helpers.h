@@ -1061,6 +1061,9 @@ bool IsFileDescriptorProto(const FileDescriptor* file, const Options& options);
 // Returns true if `field` is unlikely to be present based on PDProto profile.
 bool IsRarelyPresent(const FieldDescriptor* field, const Options& options);
 
+// XXX
+bool ShouldGenerateClass(const Descriptor* descriptor);
+
 }  // namespace cpp
 }  // namespace compiler
 }  // namespace protobuf

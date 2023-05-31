@@ -41,7 +41,6 @@
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/generated_message_reflection.h"
 #include "google/protobuf/generated_message_util.h"
-#include "google/protobuf/map_entry.h"
 #include "google/protobuf/map_field_lite.h"
 #include "google/protobuf/map_type_handler.h"
 #include "google/protobuf/message.h"
@@ -655,14 +654,6 @@ bool AllAreInitialized(const TypeDefinedMapFieldBase<Key, T>& field) {
   }
   return true;
 }
-
-template <typename T, typename Key, typename Value,
-          WireFormatLite::FieldType kKeyFieldType,
-          WireFormatLite::FieldType kValueFieldType>
-struct MapEntryToMapField<
-    MapEntry<T, Key, Value, kKeyFieldType, kValueFieldType>> {
-  typedef MapField<T, Key, Value, kKeyFieldType, kValueFieldType> MapFieldType;
-};
 
 class PROTOBUF_EXPORT DynamicMapField final
     : public TypeDefinedMapFieldBase<MapKey, MapValueRef> {

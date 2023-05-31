@@ -532,6 +532,8 @@ void FileGenerator::GenerateSourcePrelude(io::Printer* p) {
 void FileGenerator::GenerateSourceDefaultInstance(int idx, io::Printer* p) {
   MessageGenerator* generator = message_generators_[idx].get();
 
+  if (!ShouldGenerateClass(generator->descriptor())) return;
+
   // Generate the split instance first because it's needed in the constexpr
   // constructor.
   if (ShouldSplit(generator->descriptor(), options_)) {
@@ -951,14 +953,20 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
             {"defaults",
              [&] {
                for (auto& gen : message_generators_) {
-                 p->Emit(
-                     {
-                         {"ns", Namespace(gen->descriptor(), options_)},
-                         {"class", ClassName(gen->descriptor())},
-                     },
-                     R"cc(
-                       &$ns$::_$class$_default_instance_._instance,
-                     )cc");
+                 if (ShouldGenerateClass(gen->descriptor())) {
+                   p->Emit(
+                       {
+                           {"ns", Namespace(gen->descriptor(), options_)},
+                           {"class", ClassName(gen->descriptor())},
+                       },
+                       R"cc(
+                         &$ns$::_$class$_default_instance_._instance,
+                       )cc");
+                 } else {
+                   p->Emit(R"cc(
+                     nullptr,
+                   )cc");
+                 }
                }
              }},
         },
@@ -1196,6 +1204,7 @@ class FileGenerator::ForwardDeclarations {
 
     for (const auto& c : classes_) {
       const Descriptor* desc = c.second;
+      if (!ShouldGenerateClass(desc)) continue;
       p->Emit(
           {
               Sub("class", c.first).AnnotatedAs(desc),
@@ -1227,6 +1236,7 @@ class FileGenerator::ForwardDeclarations {
 
   void PrintTopLevelDecl(io::Printer* p, const Options& options) const {
     for (const auto& c : classes_) {
+      if (!ShouldGenerateClass(c.second)) continue;
       p->Emit({{"class", QualifiedClassName(c.second, options)}}, R"cc(
         template <>
         $dllexport_decl $$class$* Arena::CreateMaybeMessage<$class$>(Arena*);
@@ -1405,11 +1415,10 @@ void FileGenerator::GenerateLibraryIncludes(io::Printer* p) {
   }
   if (HasMapFields(file_)) {
     IncludeFileAndExport("third_party/protobuf/map.h", p);
+    IncludeFile("third_party/protobuf/map_entry_lite.h", p);
     if (HasDescriptorMethods(file_, options_)) {
-      IncludeFile("third_party/protobuf/map_entry.h", p);
       IncludeFile("third_party/protobuf/map_field_inl.h", p);
     } else {
-      IncludeFile("third_party/protobuf/map_entry_lite.h", p);
       IncludeFile("third_party/protobuf/map_field_lite.h", p);
     }
   }

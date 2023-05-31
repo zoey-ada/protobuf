@@ -3594,6 +3594,7 @@ bool FieldDescriptor::requires_utf8_validation() const {
 bool FieldDescriptor::has_presence() const {
   if (is_repeated()) return false;
   return cpp_type() == CPPTYPE_MESSAGE || containing_oneof() ||
+         containing_type()->options().map_entry() ||
          FileDescriptorLegacy(file_).syntax() ==
              FileDescriptorLegacy::Syntax::SYNTAX_PROTO2;
 }

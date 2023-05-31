@@ -199,7 +199,11 @@ template <typename Derived, typename Key, typename T,
           WireFormatLite::FieldType kValueFieldType>
 const Message* MapField<Derived, Key, T, kKeyFieldType,
                         kValueFieldType>::GetPrototype() const {
-  return Derived::internal_default_instance();
+  static const Message* prototype =
+      MessageFactory::generated_factory()->GetPrototype(
+          DescriptorPool::generated_pool()->FindMessageTypeByName(
+              Derived::TypeName()));
+  return prototype;
 }
 
 }  // namespace internal

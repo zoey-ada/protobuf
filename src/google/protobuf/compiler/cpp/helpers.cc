@@ -1663,6 +1663,10 @@ bool IsFileDescriptorProto(const FileDescriptor* file, const Options& options) {
   return false;
 }
 
+bool ShouldGenerateClass(const Descriptor* descriptor) {
+  return !descriptor->options().map_entry();
+}
+
 }  // namespace cpp
 }  // namespace compiler
 }  // namespace protobuf
