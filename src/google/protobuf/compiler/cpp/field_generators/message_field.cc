@@ -720,6 +720,7 @@ class RepeatedMessage : public FieldGeneratorBase {
         field_(field),
         opts_(&opts),
         weak_(IsImplicitWeakField(field, opts, scc)),
+        split_(ShouldSplit(field, opts)),
         has_required_(scc->HasRequiredFields(field->message_type())) {}
 
   ~RepeatedMessage() override = default;
@@ -735,7 +736,7 @@ class RepeatedMessage : public FieldGeneratorBase {
   void GenerateMergingCode(io::Printer* p) const override;
   void GenerateSwappingCode(io::Printer* p) const override;
   void GenerateConstructorCode(io::Printer* p) const override;
-  void GenerateCopyConstructorCode(io::Printer* p) const override {}
+  void GenerateCopyConstructorCode(io::Printer* p) const override;
   void GenerateDestructorCode(io::Printer* p) const override;
   void GenerateSerializeWithCachedSizesToArray(io::Printer* p) const override;
   void GenerateByteSize(io::Printer* p) const override;
@@ -745,11 +746,18 @@ class RepeatedMessage : public FieldGeneratorBase {
   const FieldDescriptor* field_;
   const Options* opts_;
   bool weak_;
+  bool split_;
   bool has_required_;
 };
 
 void RepeatedMessage::GeneratePrivateMembers(io::Printer* p) const {
-  p->Emit("$pb$::$Weak$RepeatedPtrField< $Submsg$ > $name$_;\n");
+  if (split_) {
+    p->Emit(R"cc(
+      $pbi$::RawPtr<$pb$::$Weak$RepeatedPtrField<$Submsg$>> $name$_;
+    )cc");
+  } else {
+    p->Emit("$pb$::$Weak$RepeatedPtrField< $Submsg$ > $name$_;\n");
+  }
 }
 
 void RepeatedMessage::GenerateAccessorDeclarations(io::Printer* p) const {
@@ -831,28 +839,47 @@ void RepeatedMessage::GenerateInlineAccessorDefinitions(io::Printer* p) const {
       "  return _internal_$name$();\n"
       "}\n");
 
-  p->Emit(R"cc(
-    inline const $pb$::RepeatedPtrField<$Submsg$>&
-    $classname$::_internal_$name$() const {
-      $TsanDetectConcurrentRead$;
-      return $field$$.weak$;
-    }
-    inline $pb$::RepeatedPtrField<$Submsg$>*
-    $classname$::_internal_mutable_$name$() {
-      $TsanDetectConcurrentRead$;
-      return &$field$$.weak$;
-    }
-  )cc");
+  if (split_) {
+    p->Emit(R"cc(
+      inline const $pb$::$Weak$RepeatedPtrField<$Submsg$>&
+      $Msg$::_internal$_weak$_$name$() const {
+        $TsanDetectConcurrentRead$;
+        return *$field_$;
+      }
+      inline $pb$::$Weak$RepeatedPtrField<$Submsg$>*
+      $Msg$::_internal_mutable$_weak$_$name$() {
+        $TsanDetectConcurrentRead$;
+        $PrepareSplitMessageForWrite$;
+        if ($field_$.IsDefault()) {
+          $field_$.Set(
+              CreateMaybeMessage<$pb$::$Weak$RepeatedPtrField<$Submsg$>>(
+                  GetArenaForAllocation()));
+        }
+        return $field_$.Get();
+      }
+    )cc");
+  } else {
+    p->Emit(R"cc(
+      inline const $pb$::$Weak$RepeatedPtrField<$Submsg$>&
+      $Msg$::_internal$_weak$_$name$() const {
+        $TsanDetectConcurrentRead$;
+        return $field_$;
+      }
+      inline $pb$::$Weak$RepeatedPtrField<$Submsg$>*
+      $Msg$::_internal_mutable$_weak$_$name$() {
+        $TsanDetectConcurrentRead$;
+        return &$field_$;
+      }
+    )cc");
+  }
   if (weak_) {
     p->Emit(R"cc(
-      inline const $pb$::WeakRepeatedPtrField<$Submsg$>&
-      $Msg$::_internal_weak_$name$() const {
-        $TsanDetectConcurrentRead$;
-        return $field$;
+      inline const $pb$::RepeatedPtrField<$Submsg$>& $Msg$::_internal_$name$()
+          const {
+        return _internal_weak_$name$().weak;
       }
-      inline $pb$::WeakRepeatedPtrField<$Submsg$>*
-      $Msg$::_internal_mutable_weak_$name$() {
-        return &$field$;
+      inline $pb$::RepeatedPtrField<$Submsg$>* $Msg$::_internal_mutable_$name$() {
+        return &_internal_mutable_weak_$name$()->weak;
       }
     )cc");
   }
@@ -863,23 +890,45 @@ void RepeatedMessage::GenerateClearingCode(io::Printer* p) const {
 }
 
 void RepeatedMessage::GenerateMergingCode(io::Printer* p) const {
+  if (split_) {
+    p->Emit(R"cc(if (!from.$field_$.IsDefault()) )cc");
+  }
   p->Emit(
       "_this->_internal_mutable$_weak$_$name$()->MergeFrom(from._internal"
       "$_weak$_$name$());\n");
 }
 
 void RepeatedMessage::GenerateSwappingCode(io::Printer* p) const {
-  p->Emit(
-      "_internal_mutable$_weak$_$name$()->InternalSwap(other->_internal_"
-      "mutable$_weak$_$name$());\n");
+  ABSL_CHECK(!ShouldSplit(descriptor_, options_));
+  p->Emit(R"cc(
+    $field_$.InternalSwap(&other->$field_$);
+  )cc");
 }
 
 void RepeatedMessage::GenerateConstructorCode(io::Printer* p) const {
   // Not needed for repeated fields.
 }
 
+void RepeatedMessage::GenerateCopyConstructorCode(io::Printer* p) const {
+  if (split_) {
+    p->Emit(R"cc(
+      if (!from._internal$_weak$_$name$().empty()) {
+        _internal_mutable$_weak$_$name$()->MergeFrom(from._internal$_weak$_$name$());
+      }
+    )cc");
+  }
+}
+
 void RepeatedMessage::GenerateDestructorCode(io::Printer* p) const {
-  p->Emit("$field_$.~$Weak$RepeatedPtrField();\n");
+  if (split_) {
+    p->Emit(R"cc(
+      if (!$field_$.IsDefault()) {
+        delete $field_$.Get();
+      }
+    )cc");
+  } else {
+    p->Emit("$field_$.~$Weak$RepeatedPtrField();\n");
+  }
 }
 
 void RepeatedMessage::GenerateSerializeWithCachedSizesToArray(
