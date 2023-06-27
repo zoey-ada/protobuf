@@ -600,10 +600,6 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
 #error PROTOBUF_FORCE_COPY_DEFAULT_STRING was previously defined
 #endif
 
-#ifdef PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION
-#error PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION was previously defined
-#endif
-
 #ifdef PROTOBUF_FALLTHROUGH_INTENDED
 #error PROTOBUF_FALLTHROUGH_INTENDED was previously defined
 #endif
@@ -876,7 +872,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
 #endif
 #if !defined(PROTOBUF_TEMPORARY_DISABLE_TABLE_PARSER_ON_REFLECTION)
 #define PROTOBUF_USE_TABLE_PARSER_ON_REFLECTION 1
-#endif  // PROTOBUF_ENABLE_FORCE_ALLOCATION_ON_CONSTRUCTION
+#endif  // !PROTOBUF_TEMPORARY_DISABLE_TABLE_PARSER_ON_REFLECTION
 
 // Note that this is performance sensitive: changing the parameters will change
 // the registers used by the ABI calling convention, which subsequently affects
@@ -1054,7 +1050,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
 // to fix https://github.com/protocolbuffers/protobuf/issues/12313
 #pragma clang diagnostic ignored "-Wunused-parameter"
 // -Wshadow means that declaration shadows a variable.
-// for (int i = 0; i < file_->public_dependency_count(); ++i) 
+// for (int i = 0; i < file_->public_dependency_count(); ++i)
 //   for (int i = 0; i < public_dep->message_type_count(); ++i)
 #pragma clang diagnostic ignored "-Wshadow"
 #endif
@@ -1081,7 +1077,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
 // to fix https://github.com/protocolbuffers/protobuf/issues/12313
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 // -Wshadow means that declaration shadows a variable.
-// for (int i = 0; i < file_->public_dependency_count(); ++i) 
+// for (int i = 0; i < file_->public_dependency_count(); ++i)
 //   for (int i = 0; i < public_dep->message_type_count(); ++i)
 #pragma GCC diagnostic ignored "-Wshadow"
 #ifndef __clang__

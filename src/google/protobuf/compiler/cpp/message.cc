@@ -2339,17 +2339,6 @@ void MessageGenerator::GenerateSharedConstructorCode(io::Printer* p) {
                field_generators_.get(field).GenerateConstructorCode(p);
              }
            }},
-          {"force_allocation",
-           [&] {
-             if (!ShouldForceAllocationOnConstruction(descriptor_, options_))
-               return;
-             p->Emit(R"cc(
-               //~ force alignment
-#ifdef PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION
-               $mutable_unknown_fields$;
-#endif  // PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION
-             )cc");
-           }},
           {"clear_oneofs",
            [&] {
              for (auto oneof : OneOfRange(descriptor_)) {
@@ -2368,7 +2357,6 @@ void MessageGenerator::GenerateSharedConstructorCode(io::Printer* p) {
           };
           $inlined_strings_init$;
           $field_ctor_code$;
-          $force_allocation$;
           $clear_oneofs$;
         }
       )cc");
@@ -2632,13 +2620,6 @@ void MessageGenerator::GenerateCopyConstructorBody(io::Printer* p) const {
       "::memcpy(&$first$, &from.$first$,\n"
       "  static_cast<::size_t>(reinterpret_cast<char*>(&$last$) -\n"
       "  reinterpret_cast<char*>(&$first$)) + sizeof($last$));\n";
-
-  if (ShouldForceAllocationOnConstruction(descriptor_, options_)) {
-    format(
-        "#ifdef PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION\n"
-        "$mutable_unknown_fields$;\n"
-        "#endif // PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION\n");
-  }
 
   for (size_t i = 0; i < optimized_order_.size(); ++i) {
     const FieldDescriptor* field = optimized_order_[i];
