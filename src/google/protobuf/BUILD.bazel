@@ -177,6 +177,16 @@ proto_library(
     ],
 )
 
+proto_library(
+    name = "cpp_features_proto",
+    srcs = ["cpp_features.proto"],
+    strip_import_prefix = "/src",
+    visibility = [
+        "//:__pkg__",
+        "//pkg:__pkg__",
+    ],
+)
+
 ################################################################################
 # C++ Runtime Library
 ################################################################################
@@ -419,11 +429,13 @@ cc_library(
     name = "protobuf_nowkt",
     srcs = [
         "any.cc",
+        "cpp_features.pb.cc",
         "descriptor.cc",
         "descriptor.pb.cc",
         "descriptor_database.cc",
         "dynamic_message.cc",
         "extension_set_heavy.cc",
+        "feature_resolver.cc",
         "generated_message_bases.cc",
         "generated_message_reflection.cc",
         "generated_message_tctable_full.cc",
@@ -439,12 +451,14 @@ cc_library(
         "wire_format.cc",
     ],
     hdrs = [
+        "cpp_features.pb.h",
         "descriptor.h",
         "descriptor.pb.h",
         "descriptor_database.h",
         "descriptor_legacy.h",
         "descriptor_visitor.h",
         "dynamic_message.h",
+        "feature_resolver.h",
         "field_access_listener.h",
         "generated_enum_reflection.h",
         "generated_message_bases.h",
@@ -572,6 +586,12 @@ filegroup(
     name = "descriptor_proto_srcs",
     srcs = ["descriptor.proto"],
     visibility = ["//:__subpackages__"],
+)
+
+filegroup(
+    name = "cpp_features_proto_srcs",
+    srcs = ["cpp_features.proto"],
+    visibility = ["//src/google/protobuf/compiler/cpp:__pkg__"],
 )
 
 filegroup(
@@ -789,6 +809,16 @@ filegroup(
     data = [
         "descriptor.pb.cc",
         "descriptor.pb.h",
+    ],
+    visibility = ["//src/google/protobuf/compiler/cpp:__pkg__"],
+)
+
+filegroup(
+    name = "cpp_features_cc_srcs",
+    testonly = 1,
+    data = [
+        "cpp_features.pb.cc",
+        "cpp_features.pb.h",
     ],
     visibility = ["//src/google/protobuf/compiler/cpp:__pkg__"],
 )

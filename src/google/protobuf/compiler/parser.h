@@ -530,6 +530,9 @@ class PROTOBUF_EXPORT Parser {
 
   // Whether fields without label default to optional fields.
   bool DefaultToOptionalFields() const {
+#ifdef PROTOBUF_FUTURE_EDITIONS
+    if (syntax_identifier_ == "editions") return true;
+#endif  // PROTOBUF_FUTURE_EDITIONS
     return syntax_identifier_ == "proto3";
   }
 
