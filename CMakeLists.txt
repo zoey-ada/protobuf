@@ -262,7 +262,7 @@ if (MSVC)
     /wd4996 # The compiler encountered a deprecated declaration.
   )
   # Allow big object
-  add_definitions(/bigobj)
+  add_compile_options(/bigobj)
   string(REPLACE "/" "\\" PROTOBUF_SOURCE_WIN32_PATH ${protobuf_SOURCE_DIR})
   string(REPLACE "/" "\\" PROTOBUF_BINARY_WIN32_PATH ${protobuf_BINARY_DIR})
   string(REPLACE "." ","  protobuf_RC_FILEVERSION "${protobuf_VERSION}")
